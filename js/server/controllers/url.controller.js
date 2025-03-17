@@ -3,11 +3,12 @@ import { createHash } from "crypto";
 import dotenv from "dotenv";
 import { cacheUrl } from "../middlewares/cache.middleware.js";
 import QRCode from "qrcode";
+import bcrypt from "bcrypt"
 
 dotenv.config();
 
 export const shortenUrl = async (req, res) => {
-  const { longUrl, expiresAt, customAlias } = req.body;
+  const { longUrl, expiresAt, customAlias, password } = req.body;
 
   try {
     if (!longUrl) {
@@ -38,9 +39,20 @@ export const shortenUrl = async (req, res) => {
       }
     }
 
-    const qrCode = await QRCode.toDataURL(`${process.env.BASE_URL}/${shortCode}`);
+    const qrCode = await QRCode.toDataURL(
+      `${process.env.BASE_URL}/${shortCode}`
+    );
 
-    const newUrl = new Url({ longUrl, shortCode, expiresAt, qrCode });
+    let hashedPassword = password ? await bcrypt.hash(password, 8) : null;
+
+    const newUrl = new Url({
+      longUrl,
+      shortCode,
+      expiresAt,
+      qrCode,
+      password: hashedPassword, 
+    });
+
     await newUrl.save();
 
     res.json({ shortUrl: `${process.env.BASE_URL}/${shortCode}`, qrCode });
@@ -52,18 +64,35 @@ export const shortenUrl = async (req, res) => {
 
 export const redirectUrl = async (req, res) => {
   const { shortCode } = req.params;
+  const { password } = req.body; 
+
   if (!shortCode) {
     return res.status(400).json({ error: "Short code is required" });
   }
+
   try {
     console.log("Cache Miss ❌ - Proceeding to DB...");
     const urlEntry = await Url.findOne({ shortCode });
+
     if (!urlEntry) {
       return res.status(404).json({ error: "Short URL not found" });
     }
+
     if (urlEntry.expiresAt && new Date() > urlEntry.expiresAt) {
       await Url.deleteOne({ _id: urlEntry._id });
       return res.status(410).json({ error: "Short URL has expired" });
+    }
+
+    if (urlEntry.password) {
+      if (!password) {
+        return res
+          .status(401)
+          .json({ error: "Password required for this URL" });
+      }
+      const isMatch = await bcrypt.compare(password, urlEntry.password);
+      if (!isMatch) {
+        return res.status(403).json({ error: "Invalid password" });
+      }
     }
 
     urlEntry.clicks += 1;
@@ -77,6 +106,7 @@ export const redirectUrl = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 
 export const getShortenUrl = async (req, res) => {
   const { shortCode } = req.params;
