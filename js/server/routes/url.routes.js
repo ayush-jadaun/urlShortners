@@ -4,8 +4,11 @@ import {
   getShortenUrl,
   redirectUrl,
 } from "../controllers/url.controller.js";
+import { limiter } from "../middlewares/rateLimiter.js";
 
 const router = express.Router();
+
+router.use(limiter);
 
 router.post("/shorten", shortenUrl);
 router.get("/:shortCode", redirectUrl);
