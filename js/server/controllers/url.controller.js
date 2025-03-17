@@ -6,17 +6,24 @@ import { cacheUrl} from "../middlewares/cache.middleware.js";
 dotenv.config();
 
 export const shortenUrl = async (req, res) => {
-  const { longUrl, expiresAt } = req.body;
+  const { longUrl, expiresAt, customAlias } = req.body;
 
   try {
     if (!longUrl) {
       return res.status(400).json({ error: "URL is required" });
     }
 
-    const shortCode = createHash("sha3-256")
-      .update(longUrl)
-      .digest("hex")
-      .slice(0, 8);
+    let shortCode =
+      customAlias ||
+      createHash("sha3-256").update(longUrl).digest("hex").slice(0, 8);
+
+    // Ensure custom alias is unique
+    if (customAlias) {
+      const aliasExists = await Url.findOne({ shortCode: customAlias });
+      if (aliasExists) {
+        return res.status(400).json({ error: "Custom alias is already taken" });
+      }
+    }
 
     const existingUrl = await Url.findOne({ shortCode });
 
@@ -41,14 +48,12 @@ export const shortenUrl = async (req, res) => {
 };
 
 export const redirectUrl = async (req, res) => {
-  console.log("req.params:", req.params);
+
   const { shortCode } = req.params;
   if (!shortCode) {
     return res.status(400).json({ error: "Short code is required" });
   }
-
   try {
- 
     console.log("Cache Miss ❌ - Proceeding to DB...");
     const urlEntry = await Url.findOne({ shortCode });
     if (!urlEntry) {
