@@ -1,6 +1,7 @@
 import Url from "../models/url.model.js";
 import { createHash } from "crypto";
-import dotenv from "dotenv"
+import dotenv from "dotenv";
+import { cacheUrl} from "../middlewares/cache.middleware.js";
 
 dotenv.config();
 
@@ -12,7 +13,6 @@ export const shortenUrl = async (req, res) => {
       return res.status(400).json({ error: "URL is required" });
     }
 
-
     const shortCode = createHash("sha3-256")
       .update(longUrl)
       .digest("hex")
@@ -21,7 +21,6 @@ export const shortenUrl = async (req, res) => {
     const existingUrl = await Url.findOne({ shortCode });
 
     if (existingUrl) {
-
       if (existingUrl.expiresAt && new Date() > existingUrl.expiresAt) {
         await Url.deleteOne({ _id: existingUrl._id });
       } else {
@@ -31,7 +30,6 @@ export const shortenUrl = async (req, res) => {
       }
     }
 
- 
     const newUrl = new Url({ longUrl, shortCode, expiresAt });
     await newUrl.save();
 
@@ -41,25 +39,30 @@ export const shortenUrl = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 export const redirectUrl = async (req, res) => {
+  console.log("req.params:", req.params);
   const { shortCode } = req.params;
+  if (!shortCode) {
+    return res.status(400).json({ error: "Short code is required" });
+  }
 
   try {
+ 
+    console.log("Cache Miss ❌ - Proceeding to DB...");
     const urlEntry = await Url.findOne({ shortCode });
-
     if (!urlEntry) {
       return res.status(404).json({ error: "Short URL not found" });
     }
-
-
     if (urlEntry.expiresAt && new Date() > urlEntry.expiresAt) {
       await Url.deleteOne({ _id: urlEntry._id });
       return res.status(410).json({ error: "Short URL has expired" });
     }
 
-
     urlEntry.clicks += 1;
     await urlEntry.save();
+
+    await cacheUrl(shortCode, urlEntry.longUrl);
 
     res.redirect(urlEntry.longUrl);
   } catch (err) {
@@ -67,6 +70,8 @@ export const redirectUrl = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+
 export const getShortenUrl = async (req, res) => {
   const { shortCode } = req.params;
 
