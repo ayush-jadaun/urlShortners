@@ -6,8 +6,7 @@ const urlSchema = new Schema({
     required: true,
     trim: true,
   },
-  shortCode: {
-    // ✅ Store only the shortCode
+  shortCode: {  
     type: String,
     required: true,
     unique: true,
@@ -17,7 +16,7 @@ const urlSchema = new Schema({
     default: Date.now,
   },
   expiresAt: {
-    type: Date,
+    type: Date, 
     default: null,
   },
   clicks: {

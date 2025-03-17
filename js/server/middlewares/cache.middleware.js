@@ -9,10 +9,9 @@ const redisClient = new Redis({
   password: process.env.REDIS_PASSWORD,
 });
 
-
 export const checkCache = async (req, res, next) => {
-  const { shortCode } = req.params;
     console.log("Inside checkCache - req.params:", req.params);
+    const { shortCode } = req.params;
 
 
   try {
@@ -30,10 +29,9 @@ export const checkCache = async (req, res, next) => {
   }
 };
 
-
 export const cacheUrl = async (shortCode, longUrl) => {
   try {
-    await redisClient.set(shortCode, longUrl, "EX", 86400); // Store with 24-hour expiry
+    await redisClient.set(shortCode, longUrl, "EX", 86400); 
     console.log("Cached in Redis 🔥");
   } catch (error) {
     console.error("Error caching URL:", error);
