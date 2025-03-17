@@ -7,6 +7,7 @@ const urlSchema = new Schema({
     trim: true,
   },
   shortCode: {
+    // ✅ Store only the shortCode
     type: String,
     required: true,
     unique: true,
@@ -16,7 +17,7 @@ const urlSchema = new Schema({
     default: Date.now,
   },
   expiresAt: {
-    type: Date, 
+    type: Date,
     default: null,
   },
   clicks: {
@@ -24,7 +25,6 @@ const urlSchema = new Schema({
     default: 0,
   },
 });
-
 
 const Url = model("Url", urlSchema);
 export default Url;
