@@ -3,7 +3,9 @@ import dotenv from "dotenv";
 import connectDb from "./db/db.js";
 import urlRoutes from "./routes/url.routes.js"
 
-dotenv.config();
+dotenv.config("./.env");
+console.log("BASE_URL:", process.env.BASE_URL);
+
 
 const app = express();
 

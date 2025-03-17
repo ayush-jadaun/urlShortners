@@ -1,5 +1,8 @@
 import Url from "../models/url.model.js";
 import { createHash } from "crypto";
+import dotenv from "dotenv"
+
+dotenv.config();
 
 export const shortenUrl = async (req, res) => {
   const { longUrl, expiresAt } = req.body;
