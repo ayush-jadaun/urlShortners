@@ -3,7 +3,7 @@ import { createHash } from "crypto";
 import dotenv from "dotenv";
 import { cacheUrl } from "../middlewares/cache.middleware.js";
 import QRCode from "qrcode";
-import bcrypt from "bcrypt"
+import bcrypt from "bcrypt";
 
 dotenv.config();
 
@@ -13,6 +13,13 @@ export const shortenUrl = async (req, res) => {
   try {
     if (!longUrl) {
       return res.status(400).json({ error: "URL is required" });
+    }
+
+
+    try {
+      new URL(longUrl);
+    } catch (e) {
+      return res.status(400).json({ error: "Invalid URL format" });
     }
 
     let shortCode =
@@ -34,6 +41,7 @@ export const shortenUrl = async (req, res) => {
       } else {
         return res.json({
           shortUrl: `${process.env.BASE_URL}/${existingUrl.shortCode}`,
+          shortCode: existingUrl.shortCode,
           qrCode: existingUrl.qrCode,
         });
       }
@@ -50,12 +58,16 @@ export const shortenUrl = async (req, res) => {
       shortCode,
       expiresAt,
       qrCode,
-      password: hashedPassword, 
+      password: hashedPassword,
     });
 
     await newUrl.save();
 
-    res.json({ shortUrl: `${process.env.BASE_URL}/${shortCode}`, qrCode });
+    res.json({
+      shortUrl: `${process.env.BASE_URL}/${shortCode}`,
+      shortCode,
+      qrCode,
+    });
   } catch (err) {
     console.error("Error in creating short URL:", err);
     res.status(500).json({ error: "Internal Server Error" });
@@ -64,14 +76,13 @@ export const shortenUrl = async (req, res) => {
 
 export const redirectUrl = async (req, res) => {
   const { shortCode } = req.params;
-  const { password } = req.body; 
 
   if (!shortCode) {
     return res.status(400).json({ error: "Short code is required" });
   }
 
   try {
-    console.log("Cache Miss ❌ - Proceeding to DB...");
+    console.log(`Looking up shortCode: ${shortCode}`);
     const urlEntry = await Url.findOne({ shortCode });
 
     if (!urlEntry) {
@@ -84,15 +95,8 @@ export const redirectUrl = async (req, res) => {
     }
 
     if (urlEntry.password) {
-      if (!password) {
-        return res
-          .status(401)
-          .json({ error: "Password required for this URL" });
-      }
-      const isMatch = await bcrypt.compare(password, urlEntry.password);
-      if (!isMatch) {
-        return res.status(403).json({ error: "Invalid password" });
-      }
+      // For password-protected URLs, redirect to the password entry page
+      return res.redirect(`${process.env.CLIENT_URL}/protected/${shortCode}`);
     }
 
     urlEntry.clicks += 1;
@@ -107,6 +111,51 @@ export const redirectUrl = async (req, res) => {
   }
 };
 
+export const checkPasswordAndRedirect = async (req, res) => {
+  const { shortCode } = req.params;
+  const { password } = req.body;
+
+  if (!shortCode || !password) {
+    return res
+      .status(400)
+      .json({ error: "Short code and password are required" });
+  }
+
+  try {
+    const urlEntry = await Url.findOne({ shortCode });
+
+    if (!urlEntry) {
+      return res.status(404).json({ error: "Short URL not found" });
+    }
+
+    if (urlEntry.expiresAt && new Date() > urlEntry.expiresAt) {
+      await Url.deleteOne({ _id: urlEntry._id });
+      return res.status(410).json({ error: "Short URL has expired" });
+    }
+
+    if (!urlEntry.password) {
+      // URL doesn't need a password
+      urlEntry.clicks += 1;
+      await urlEntry.save();
+      await cacheUrl(shortCode, urlEntry.longUrl);
+      return res.json({ redirectUrl: urlEntry.longUrl });
+    }
+
+    const isMatch = await bcrypt.compare(password, urlEntry.password);
+    if (!isMatch) {
+      return res.status(403).json({ error: "Invalid password" });
+    }
+
+    urlEntry.clicks += 1;
+    await urlEntry.save();
+    await cacheUrl(shortCode, urlEntry.longUrl);
+
+    return res.json({ redirectUrl: urlEntry.longUrl });
+  } catch (err) {
+    console.error("Error in password verification:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
 
 export const getShortenUrl = async (req, res) => {
   const { shortCode } = req.params;
@@ -121,10 +170,12 @@ export const getShortenUrl = async (req, res) => {
     res.json({
       longUrl: urlEntry.longUrl,
       shortUrl: `${process.env.BASE_URL}/${shortCode}`,
+      shortCode,
       qrCode: urlEntry.qrCode,
       clicks: urlEntry.clicks,
       createdAt: urlEntry.createdAt,
       expiresAt: urlEntry.expiresAt,
+      requiresPassword: !!urlEntry.password,
     });
   } catch (err) {
     console.error("Error fetching URL:", err);
