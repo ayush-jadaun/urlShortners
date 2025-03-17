@@ -64,7 +64,6 @@ export const redirectUrl = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
 export const getShortenUrl = async (req, res) => {
   const { shortCode } = req.params;
 
