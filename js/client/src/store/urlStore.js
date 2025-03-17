@@ -18,15 +18,15 @@ const useUrlStore = create((set, get) => ({
   setLongUrl: (url) => set({ longUrl: url }),
   setPassword: (password) => set({ password }),
 
-  shortenUrl: async () => {
+  shortenUrl: async (password = null) => {
     const { longUrl } = get();
 
-
+    // Basic URL validation
     try {
       if (!longUrl.trim()) {
         return set({ error: "URL is required" });
       }
-      new URL(longUrl);
+      new URL(longUrl); // Will throw if invalid URL
     } catch (e) {
       return set({
         error: "Please enter a valid URL including http:// or https://",
@@ -38,6 +38,7 @@ const useUrlStore = create((set, get) => ({
     try {
       const response = await axios.post(`${API_BASE_URL}/shorten`, {
         longUrl,
+        password: password || undefined,
       });
 
       set({
