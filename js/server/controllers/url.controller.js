@@ -1,7 +1,8 @@
 import Url from "../models/url.model.js";
 import { createHash } from "crypto";
 import dotenv from "dotenv";
-import { cacheUrl} from "../middlewares/cache.middleware.js";
+import { cacheUrl } from "../middlewares/cache.middleware.js";
+import QRCode from "qrcode";
 
 dotenv.config();
 
@@ -17,7 +18,6 @@ export const shortenUrl = async (req, res) => {
       customAlias ||
       createHash("sha3-256").update(longUrl).digest("hex").slice(0, 8);
 
-    // Ensure custom alias is unique
     if (customAlias) {
       const aliasExists = await Url.findOne({ shortCode: customAlias });
       if (aliasExists) {
@@ -33,14 +33,17 @@ export const shortenUrl = async (req, res) => {
       } else {
         return res.json({
           shortUrl: `${process.env.BASE_URL}/${existingUrl.shortCode}`,
+          qrCode: existingUrl.qrCode,
         });
       }
     }
 
-    const newUrl = new Url({ longUrl, shortCode, expiresAt });
+    const qrCode = await QRCode.toDataURL(`${process.env.BASE_URL}/${shortCode}`);
+
+    const newUrl = new Url({ longUrl, shortCode, expiresAt, qrCode });
     await newUrl.save();
 
-    res.json({ shortUrl: `${process.env.BASE_URL}/${shortCode}` });
+    res.json({ shortUrl: `${process.env.BASE_URL}/${shortCode}`, qrCode });
   } catch (err) {
     console.error("Error in creating short URL:", err);
     res.status(500).json({ error: "Internal Server Error" });
@@ -48,7 +51,6 @@ export const shortenUrl = async (req, res) => {
 };
 
 export const redirectUrl = async (req, res) => {
-
   const { shortCode } = req.params;
   if (!shortCode) {
     return res.status(400).json({ error: "Short code is required" });
@@ -76,7 +78,6 @@ export const redirectUrl = async (req, res) => {
   }
 };
 
-
 export const getShortenUrl = async (req, res) => {
   const { shortCode } = req.params;
 
@@ -90,6 +91,7 @@ export const getShortenUrl = async (req, res) => {
     res.json({
       longUrl: urlEntry.longUrl,
       shortUrl: `${process.env.BASE_URL}/${shortCode}`,
+      qrCode: urlEntry.qrCode,
       clicks: urlEntry.clicks,
       createdAt: urlEntry.createdAt,
       expiresAt: urlEntry.expiresAt,
