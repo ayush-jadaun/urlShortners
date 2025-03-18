@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:5000/api/url";
+const API_BASE_URL = "https://urlshortners-1fte.onrender.com/api/url";
 
 const useUrlStore = create((set, get) => ({
   longUrl: "",
