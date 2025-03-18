@@ -146,20 +146,22 @@ curl -X POST http://localhost:5000/api/url/shorten \
 ## Project Structure
 
 ```
-url-shortener/
-├── client/                # Frontend React application
-│   ├── src/
-│   │   ├── components/    # React components
-│   │   ├── App.js         # Main application component
-│   │   └── store.js       # Zustand store
-│   └── ...
-├── server/                # Backend Express application
-│   ├── controllers/       # Route controllers
-│   ├── middlewares/       # Express middlewares (e.g., rate limiter, caching)
-│   ├── models/            # Mongoose models for MongoDB
-│   ├── routes/            # Express routes
-│   └── server.js          # Entry point for the backend server
-└── README.md              # This file
+url-shortener/  
+├── client/                # Frontend React application  
+│   ├── src/  
+│   │   ├── components/    # React components  
+│   │   ├── store/         # Zustand store  
+│   │   ├── main.jsx       # Entry point, imports App.jsx and index.css  
+│   │   ├── App.jsx        # Main application component  
+│   │   └── index.css      # Global styles  
+│   └── ...  
+├── server/                # Backend Express application  
+│   ├── controllers/       # Route controllers  
+│   ├── middlewares/       # Express middlewares (e.g., rate limiter, caching)  
+│   ├── models/            # Mongoose models for MongoDB  
+│   ├── routes/            # Express routes  
+│   └── server.js          # Entry point for the backend server  
+└── README.md              # Project documentation  
 ```
 
 ## Deployment
