@@ -1,5 +1,5 @@
 import Url from "../models/url.model.js";
-import { createHash } from "crypto";
+import { createHash,randomBytes } from "crypto";
 import dotenv from "dotenv";
 import { cacheUrl } from "../middlewares/cache.middleware.js";
 import QRCode from "qrcode";
@@ -15,38 +15,30 @@ export const shortenUrl = async (req, res) => {
       return res.status(400).json({ error: "URL is required" });
     }
 
-
     try {
       new URL(longUrl);
     } catch (e) {
       return res.status(400).json({ error: "Invalid URL format" });
     }
 
-    let shortCode =
-      customAlias ||
-      createHash("sha3-256").update(longUrl).digest("hex").slice(0, 8);
-
+    let shortCode;
     if (customAlias) {
-      const aliasExists = await Url.findOne({ shortCode: customAlias });
+     
+      shortCode = customAlias;
+      const aliasExists = await Url.findOne({ shortCode });
       if (aliasExists) {
         return res.status(400).json({ error: "Custom alias is already taken" });
       }
+    } else {
+   
+      const uniqueInput = longUrl + Date.now() + randomBytes(4).toString("hex");
+      shortCode = createHash("sha3-256")
+        .update(uniqueInput)
+        .digest("hex")
+        .slice(0, 8);
     }
 
-    const existingUrl = await Url.findOne({ shortCode });
-
-    if (existingUrl) {
-      if (existingUrl.expiresAt && new Date() > existingUrl.expiresAt) {
-        await Url.deleteOne({ _id: existingUrl._id });
-      } else {
-        return res.json({
-          shortUrl: `${process.env.BASE_URL}/${existingUrl.shortCode}`,
-          shortCode: existingUrl.shortCode,
-          qrCode: existingUrl.qrCode,
-        });
-      }
-    }
-
+ 
     const qrCode = await QRCode.toDataURL(
       `${process.env.BASE_URL}/${shortCode}`
     );
@@ -64,9 +56,9 @@ export const shortenUrl = async (req, res) => {
     await newUrl.save();
 
     res.json({
-      shortUrl: `${process.env.BASE_URL}/${shortCode}`,
-      shortCode,
-      qrCode,
+      shortUrl: `${process.env.BASE_URL}/${newUrl.shortCode}`,
+      shortCode: newUrl.shortCode,
+      qrCode: newUrl.qrCode,
     });
   } catch (err) {
     console.error("Error in creating short URL:", err);

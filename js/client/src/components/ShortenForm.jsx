@@ -65,7 +65,14 @@ const ShortenForm = () => {
             <input
               type="checkbox"
               checked={showPasswordOption}
-              onChange={() => setShowPasswordOption(!showPasswordOption)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setShowPasswordOption(checked);
+                if (!checked) {
+                  // Clear password when password protection is turned off.
+                  setPassword("");
+                }
+              }}
               className="mr-2"
             />
             <span>Password protect this URL</span>
