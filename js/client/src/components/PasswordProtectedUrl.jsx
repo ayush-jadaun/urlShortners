@@ -14,7 +14,7 @@ const PasswordProtectedUrl = () => {
     const fetchUrlInfo = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:5000/api/url/info/${shortCode}`
+          `https://urlshortners-1fte.onrender.com/api/url/info/${shortCode}`
         );
         setUrlInfo(response.data);
       } catch (err) {
@@ -32,7 +32,7 @@ const PasswordProtectedUrl = () => {
 
     try {
       const response = await axios.post(
-        `http://localhost:5000/api/url/${shortCode}/verify`,
+        `https://urlshortners-1fte.onrender.com/api/url/${shortCode}/verify`,
         { password }
       );
 
