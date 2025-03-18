@@ -6,10 +6,13 @@ const ShortenForm = () => {
     useUrlStore();
   const [showPasswordOption, setShowPasswordOption] = useState(false);
   const [password, setPassword] = useState("");
+  const [customAlias, setCustomAlias] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await shortenUrl(password);
+    // Pass customAlias and expiresAt in addition to password.
+    await shortenUrl({ password, customAlias, expiresAt });
   };
 
   const copyToClipboard = (text) => {
@@ -29,6 +32,33 @@ const ShortenForm = () => {
           className="p-2 w-full border rounded mb-3"
           required
         />
+
+        <div className="mb-3">
+          <label htmlFor="customAlias" className="block text-gray-700 mb-2">
+            Custom Alias (optional)
+          </label>
+          <input
+            type="text"
+            id="customAlias"
+            value={customAlias}
+            onChange={(e) => setCustomAlias(e.target.value)}
+            placeholder="Enter a custom alias"
+            className="p-2 w-full border rounded"
+          />
+        </div>
+
+        <div className="mb-3">
+          <label htmlFor="expiresAt" className="block text-gray-700 mb-2">
+            Expiry Time (optional)
+          </label>
+          <input
+            type="datetime-local"
+            id="expiresAt"
+            value={expiresAt}
+            onChange={(e) => setExpiresAt(e.target.value)}
+            className="p-2 w-full border rounded"
+          />
+        </div>
 
         <div className="mb-3">
           <label className="flex items-center">
