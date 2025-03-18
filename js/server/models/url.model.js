@@ -6,6 +6,10 @@ const urlSchema = new Schema({
     required: true,
     trim: true,
   },
+  password:{
+    type:String,
+    required:false,
+  },
   shortCode: {
     type: String,
     required: true,
