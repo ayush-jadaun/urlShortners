@@ -5,8 +5,19 @@ dotenv.config();
 
 const redisClient = new Redis({
   host: process.env.REDIS_HOST,
-  port: process.env.REDIS_PORT,
+  port: Number(process.env.REDIS_PORT),
   password: process.env.REDIS_PASSWORD,
+  retryStrategy(times) {
+    return Math.min(times * 50, 2000); 
+  },
+});
+
+redisClient.on("error", (err) => {
+  console.error("❌ Redis connection error:", err);
+});
+
+redisClient.on("connect", () => {
+  console.log("✅ Connected to Redis successfully!");
 });
 
 export const checkCache = async (req, res, next) => {
@@ -14,16 +25,13 @@ export const checkCache = async (req, res, next) => {
   const { shortCode } = req.params;
 
   try {
-    // First, check if URL is in cache
     const cachedData = await redisClient.get(shortCode);
 
     if (cachedData) {
-      // Check if we've cached both the URL and a password flag
-      // Format in Redis: "url:isPasswordProtected" (e.g., "https://example.com:1")
-      const [cachedUrl, isPasswordProtected] = cachedData.split(":");
 
-      // If URL is password protected, don't redirect from cache
-      if (isPasswordProtected === "1") {
+      const { longUrl, isPasswordProtected } = JSON.parse(cachedData);
+
+      if (isPasswordProtected) {
         console.log(
           "Cache Hit ✅ - But URL is password protected, proceeding to controller"
         );
@@ -33,7 +41,7 @@ export const checkCache = async (req, res, next) => {
       console.log(
         "Cache Hit ✅ - URL not password protected, redirecting directly"
       );
-      return res.redirect(cachedUrl);
+      return res.redirect(longUrl);
     }
 
     console.log("Cache Miss ❌ - Proceeding to DB...");
@@ -43,21 +51,27 @@ export const checkCache = async (req, res, next) => {
     next();
   }
 };
+
 export const cacheUrl = async (
   shortCode,
   longUrl,
   isPasswordProtected = false
 ) => {
   try {
-    // Store URL with password protection flag
-    // Format: "url:isPasswordProtected" (e.g., "https://example.com:1")
-    const cacheValue = `${longUrl}:${isPasswordProtected ? "1" : "0"}`;
+    const cacheValue = JSON.stringify({ longUrl, isPasswordProtected });
 
     await redisClient.set(shortCode, cacheValue, "EX", 86400);
     console.log(
-      `Cached in Redis 🔥 (Password Protected: ${isPasswordProtected})`
+      `✅ Cached in Redis (Password Protected: ${isPasswordProtected})`
     );
   } catch (error) {
     console.error("Error caching URL:", error);
   }
 };
+
+
+process.on("SIGINT", async () => {
+  await redisClient.quit();
+  console.log("🔴 Redis connection closed");
+  process.exit(0);
+});
