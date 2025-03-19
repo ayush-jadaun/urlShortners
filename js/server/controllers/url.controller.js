@@ -1,7 +1,10 @@
 import Url from "../models/url.model.js";
-import { createHash,randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import dotenv from "dotenv";
-import { cacheUrl } from "../middlewares/cache.middleware.js";
+import {
+  cacheUrl,
+  markUrlAsProtected,
+} from "../middlewares/cache.middleware.js";
 import QRCode from "qrcode";
 import bcrypt from "bcrypt";
 
@@ -23,14 +26,12 @@ export const shortenUrl = async (req, res) => {
 
     let shortCode;
     if (customAlias) {
-     
       shortCode = customAlias;
       const aliasExists = await Url.findOne({ shortCode });
       if (aliasExists) {
         return res.status(400).json({ error: "Custom alias is already taken" });
       }
     } else {
-   
       const uniqueInput = longUrl + Date.now() + randomBytes(4).toString("hex");
       shortCode = createHash("sha3-256")
         .update(uniqueInput)
@@ -38,7 +39,6 @@ export const shortenUrl = async (req, res) => {
         .slice(0, 8);
     }
 
- 
     const qrCode = await QRCode.toDataURL(
       `${process.env.BASE_URL}/${shortCode}`
     );
@@ -54,6 +54,11 @@ export const shortenUrl = async (req, res) => {
     });
 
     await newUrl.save();
+
+    // If it has a password, mark it as protected in Redis
+    if (hashedPassword) {
+      await markUrlAsProtected(shortCode);
+    }
 
     res.json({
       shortUrl: `${process.env.BASE_URL}/${newUrl.shortCode}`,
@@ -87,7 +92,7 @@ export const redirectUrl = async (req, res) => {
     }
 
     if (urlEntry.password) {
-      // For password-protected URLs, redirect to the password entry page
+      await markUrlAsProtected(shortCode);
       return res.redirect(`${process.env.CLIENT_URL}/protected/${shortCode}`);
     }
 
@@ -126,7 +131,6 @@ export const checkPasswordAndRedirect = async (req, res) => {
     }
 
     if (!urlEntry.password) {
-      // URL doesn't need a password
       urlEntry.clicks += 1;
       await urlEntry.save();
       await cacheUrl(shortCode, urlEntry.longUrl);
@@ -140,7 +144,8 @@ export const checkPasswordAndRedirect = async (req, res) => {
 
     urlEntry.clicks += 1;
     await urlEntry.save();
-    await cacheUrl(shortCode, urlEntry.longUrl);
+
+    await markUrlAsProtected(shortCode);
 
     return res.json({ redirectUrl: urlEntry.longUrl });
   } catch (err) {

@@ -8,7 +8,7 @@ const redisClient = new Redis({
   port: Number(process.env.REDIS_PORT),
   password: process.env.REDIS_PASSWORD,
   retryStrategy(times) {
-    return Math.min(times * 50, 2000); 
+    return Math.min(times * 50, 2000);
   },
 });
 
@@ -25,22 +25,21 @@ export const checkCache = async (req, res, next) => {
   const { shortCode } = req.params;
 
   try {
+    const isProtected = await redisClient.sismember(
+      "protected_urls",
+      shortCode
+    );
+
+    if (isProtected) {
+      console.log(`Protected URL detected: ${shortCode} - Skipping cache`);
+      return next();
+    }
+
     const cachedData = await redisClient.get(shortCode);
 
     if (cachedData) {
-
-      const { longUrl, isPasswordProtected } = JSON.parse(cachedData);
-
-      if (isPasswordProtected) {
-        console.log(
-          "Cache Hit ✅ - But URL is password protected, proceeding to controller"
-        );
-        return next();
-      }
-
-      console.log(
-        "Cache Hit ✅ - URL not password protected, redirecting directly"
-      );
+      const { longUrl } = JSON.parse(cachedData);
+      console.log("Cache Hit ✅ - Redirecting to cached URL");
       return res.redirect(longUrl);
     }
 
@@ -58,17 +57,40 @@ export const cacheUrl = async (
   isPasswordProtected = false
 ) => {
   try {
-    const cacheValue = JSON.stringify({ longUrl, isPasswordProtected });
+    if (isPasswordProtected) {
+      console.log(`Marking as protected URL: ${shortCode}`);
+      await redisClient.sadd("protected_urls", shortCode);
+      // Make sure it's not in the regular cache
+      await redisClient.del(shortCode);
+      return;
+    }
 
-    await redisClient.set(shortCode, cacheValue, "EX", 86400);
-    console.log(
-      `✅ Cached in Redis (Password Protected: ${isPasswordProtected})`
+    const isProtected = await redisClient.sismember(
+      "protected_urls",
+      shortCode
     );
+    if (isProtected) {
+      console.log(`URL ${shortCode} is marked as protected - not caching`);
+      return;
+    }
+
+    const cacheValue = JSON.stringify({ longUrl });
+    await redisClient.set(shortCode, cacheValue, "EX", 86400);
+    console.log(`Cached in Redis 🔥 (ShortCode: ${shortCode})`);
   } catch (error) {
     console.error("Error caching URL:", error);
   }
 };
 
+export const markUrlAsProtected = async (shortCode) => {
+  try {
+    await redisClient.sadd("protected_urls", shortCode);
+    await redisClient.del(shortCode);
+    console.log(`Marked ${shortCode} as password-protected`);
+  } catch (error) {
+    console.error("Error marking URL as protected:", error);
+  }
+};
 
 process.on("SIGINT", async () => {
   await redisClient.quit();
